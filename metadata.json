@@ -1,0 +1,8 @@
+{
+  "name": "Apex 360: Private Wealth Node",
+  "description": "High-fidelity Capital One 360 Private Wealth Node featuring minimalist banking design, multi-user identity synchronization, and compliance dispatch simulators.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
